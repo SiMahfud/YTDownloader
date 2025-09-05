@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader & Converter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .card {
+            margin-bottom: 1.5rem;
+        }
+        #log-box {
+            background-color: #343a40;
+            color: #f8f9fa;
+            border: none;
+            padding: 1rem;
+            height: 300px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            font-family: monospace;
+            border-radius: 0.25rem;
+        }
+        #files-table th, #files-table td {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="text-center mb-4">
+            <h1 class="display-4">YouTube Downloader & Converter</h1>
+            <p class="lead">The simple way to download and convert YouTube videos.</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title h4">Download Video</h2>
+                        <p class="card-text">Download YouTube videos as MP4 files.</p>
+                        <form id="download-form">
+                            <div class="mb-3">
+                                <input type="text" name="url" class="form-control" placeholder="Enter YouTube URL" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Download Video</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title h4">Convert to MP3</h2>
+                        <p class="card-text">Convert YouTube videos to MP3 audio.</p>
+                        <form id="mp3-form">
+                            <div class="mb-3">
+                                <input type="text" name="url" class="form-control" placeholder="Enter YouTube URL" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Convert to MP3</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                My Files
+            </div>
+            <div class="card-body">
+                <table class="table table-hover" id="files-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Filename</th>
+                            <th scope="col" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- File list will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                Logs
+            </div>
+            <div id="log-box" class="card-body">Awaiting logs...</div>
+        </div>
+
+    </div>
+
+    <script>
+    // --- Cookie Helper Functions ---
+    function setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (JSON.stringify(value) || "")  + expires + "; path=/";
+    }
+
+    function getCookie(name) {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for(let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) {
+                try {
+                    return JSON.parse(c.substring(nameEQ.length, c.length));
+                } catch (e) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Fungsi untuk menghapus file
+    async function deleteFile(filename) {
+        if (!confirm(`Are you sure you want to delete ${filename}?`)) {
+            return;
+        }
+        try {
+            const response = await fetch('/api/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filename: filename }),
+            });
+            if (response.ok) {
+                fetchFiles();
+            } else {
+                const errorText = await response.text();
+                alert(`Error deleting file: ${errorText}`);
+            }
+        } catch (error) {
+            console.error('Failed to delete file:', error);
+            alert('Failed to delete file. See console for details.');
+        }
+    }
+
+    // Fungsi untuk mengambil dan menampilkan daftar file
+    async function fetchFiles() {
+        try {
+            const response = await fetch('/api/files');
+            const files = await response.json();
+            const tableBody = document.querySelector('#files-table tbody');
+            tableBody.innerHTML = '';
+
+            if (files.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="2" class="text-center">No files found.</td></tr>';
+                return;
+            }
+
+            files.forEach(file => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${file}</td>
+                    <td class="text-end">
+                        <a href="/output/${file}" class="btn btn-sm btn-primary" download>Download</a>
+                        <button class="btn btn-sm btn-danger" onclick="deleteFile('${file}')">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Failed to fetch files:', error);
+            const tableBody = document.querySelector('#files-table tbody');
+            tableBody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Failed to load files.</td></tr>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const logBox = document.getElementById('log-box');
+        const downloadForm = document.getElementById('download-form');
+        const mp3Form = document.getElementById('mp3-form');
+
+        function setupForm(form, url, logMessage) {
+            const urlInput = form.querySelector('input[name="url"]');
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const urlValue = urlInput.value;
+                if (!urlValue) return;
+
+                logBox.innerHTML += `\n${logMessage} ${urlValue}`;
+                
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'url=' + encodeURIComponent(urlValue)
+                });
+
+                urlInput.value = '';
+            });
+        }
+
+        setupForm(downloadForm, '/download', 'Adding to video download queue:');
+        setupForm(mp3Form, '/convert-to-mp3', 'Adding to MP3 conversion queue:');
+
+        const evtSource = new EventSource("/events");
+
+        evtSource.onopen = function() {
+            logBox.innerHTML = 'Connection to server established.';
+        };
+
+        evtSource.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+
+                if (data.message) {
+                    logBox.innerHTML += '\n' + data.message;
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+
+                if (data.event === 'conversionComplete' && data.filename) {
+                    let files = getCookie('files') || [];
+                    if (!files.includes(data.filename)) {
+                        files.push(data.filename);
+                        setCookie('files', files, 30);
+                    }
+                    // Refresh the file list from the authoritative source (the cookie we just set)
+                    fetchFiles();
+                }
+
+            } catch (e) {
+                console.error('Error parsing SSE data:', e);
+            }
+        };
+
+        evtSource.onerror = function(err) {
+            console.error("EventSource failed:", err);
+            logBox.innerHTML += '\nConnection error.';
+        };
+
+        fetchFiles();
+    });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
