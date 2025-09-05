@@ -25,9 +25,9 @@ Sebelum memulai, pastikan sistem Anda telah memenuhi prasyarat berikut:
 
 ## Instalasi
 
-1.  Clone repositori ini ke mesin lokal Anda. Ganti `NAMA_USER_ANDA` dengan username GitHub Anda.
+1.  Clone repositori ini ke mesin lokal Anda.
     ```sh
-    git clone https://github.com/NAMA_USER_ANDA/YTDownloader.git
+    git clone https://github.com/SiMahfud/YTDownloader.git
     ```
 
 2.  Masuk ke direktori proyek:
