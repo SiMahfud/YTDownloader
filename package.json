@@ -1,6 +1,6 @@
 {
-  "name": "nodeffmpeg",
-  "version": "1.0.0",
+  "name": "ytdownloader",
+  "version": "1.2.0",
   "description": "",
   "main": "index.js",
   "scripts": {
